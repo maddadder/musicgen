@@ -1,13 +1,13 @@
 import os
-import uuid  # Add this import
+import uuid
+import time
+import torchaudio
+from audiocraft.models import MusicGen
+from audiocraft.data.audio import audio_write
 from fastapi import FastAPI, Form, Request, Query, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-import torchaudio
-from audiocraft.models import MusicGen
-from audiocraft.data.audio import audio_write
-import time
 
 model = MusicGen.get_pretrained('facebook/musicgen-medium', device='cuda')
 model.set_generation_params(duration=12)

@@ -1,16 +1,21 @@
-from transformers import AutoProcessor, MusicgenForConditionalGeneration
-import scipy
+import os
+import uuid
+import time
+import torchaudio
+from audiocraft.models import MusicGen
+from audiocraft.data.audio import audio_write
 
-processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
-model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+model = MusicGen.get_pretrained('facebook/musicgen-medium', device='cuda')
+model.set_generation_params(duration=120)
 
-inputs = processor(
-    text=["lofi slow bpm electro chill with organic samples"],
-    padding=True,
-    return_tensors="pt",
-)
+for i in range(100):  # Generate 1 audio samples
+    start = time.time()
+    wav = model.generate(["a light and cheerly EDM track, with syncopated drums, aery pads, and strong emotions bpm: 130"], progress=True)
+    wav = wav[0]
+    end = time.time()
+    print(f"Generation took {end - start} seconds")
 
-audio_values = model.generate(**inputs, max_new_tokens=256)
+    save_path = f"audio/{uuid.uuid4()}"
 
-sampling_rate = model.config.audio_encoder.sampling_rate
-scipy.io.wavfile.write("musicgen_out.wav", rate=sampling_rate, data=audio_values[0, 0].numpy())
+    print(f"Saving {save_path}")
+    audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
