@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-model = MusicGen.get_pretrained('facebook/musicgen-medium', device='cuda')
+model = MusicGen.get_pretrained('facebook/musicgen-large', device='cuda')
 model.set_generation_params(duration=12)
 
 app = FastAPI()
