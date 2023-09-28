@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory="templates")
 # Endpoint to list available generated files
 @app.get("/list_generated_files", response_class=HTMLResponse)
 async def list_generated_files(request: Request):
-    generated_files = [f for f in os.listdir("audio") if f.endswith(".wav")]
+    generated_files = [f for f in os.listdir("audio") if f.endswith(".mp3")]
     return templates.TemplateResponse("list_files.html", {"request": request, "generated_files": generated_files})
 
 @app.get("/", response_class=HTMLResponse)

@@ -7,7 +7,6 @@ pip install -U git+https://git@github.com/facebookresearch/audiocraft#egg=audioc
 conda install "ffmpeg<5" -c conda-forge
 pip install git+https://github.com/huggingface/transformers.git
 
-
 #run the following
 uvicorn server:app --host 0.0.0.0 --port 5001
 
