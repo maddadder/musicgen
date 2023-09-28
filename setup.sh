@@ -12,4 +12,4 @@ pip install git+https://github.com/huggingface/transformers.git
 uvicorn server:app --host 0.0.0.0 --port 5001
 
 
-# open browser to: http://antec.local:5001/static/default.html
+# open browser to: http://antec.local:5001

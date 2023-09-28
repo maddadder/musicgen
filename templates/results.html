@@ -7,10 +7,9 @@
 </head>
 <body>
     <h1>Generated Music Samples</h1>
-    <p>Request: {{ request }}</p>
     <ul>
         {% for file in generated_files %}
-            <li><a href="{{ file }}" target="_blank">Play Sample {{ loop.index }}</a></li>
+            <li><a href="/audio/{{ file }}" target="_blank">Play Sample {{ loop.index }}</a></li>
         {% endfor %}
     </ul>
 </body>
