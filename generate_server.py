@@ -27,7 +27,7 @@ def convert_wav_to_mp3(wav_path):
     sound = AudioSegment.from_wav(wav_path)
 
     # Export as MP3
-    sound.export(mp3_path, format="mp3")
+    sound.export(mp3_path, format="mp3", bitrate="320k")
 
     # Delete the WAV file
     os.remove(wav_path)
