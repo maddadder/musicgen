@@ -1,20 +1,14 @@
 import os
 import uuid
 import time
-import torchaudio
 from audiocraft.models import MusicGen
 from audiocraft.data.audio import audio_write
 from fastapi import FastAPI, Form, Request, Query, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-import json
-import threading
 from pydantic import BaseModel
 from pydub import AudioSegment
-from collections import deque
-import queue
-import time
 import asyncio
 import aio_pika
 
