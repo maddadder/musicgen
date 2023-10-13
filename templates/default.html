@@ -7,13 +7,37 @@
 </head>
 <body>
     <div>musicgen</div>
-    <form action="/musicgen" method="post">
+    <form id="musicgenForm">
         <label for="text">Text:</label>
         <input type="text" id="text" name="text" value="a light and cheerly EDM track, with syncopated drums, aery pads, and strong emotions bpm: 130" required>
-        <button type="submit">Generate Music</button>
+        <button type="button" onclick="submitForm()">Generate Music</button>
     </form>
     <div>
         <a href="/list_generated_files">list previously generated music</a>
     </div>
+
+    <script>
+        function submitForm() {
+            var formData = {
+                text: document.getElementById("text").value
+            };
+
+            fetch('/musicgen', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Handle the response as needed
+                console.log(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
 </body>
 </html>
