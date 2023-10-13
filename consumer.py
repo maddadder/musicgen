@@ -13,7 +13,7 @@ from io import BytesIO
 
 model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
 
-async def callback(message: aio_pika.IncomingMessage, ack_channel: aio_pika.channel):
+async def callback(message: aio_pika.IncomingMessage):
     async with message.process():
         # Deserialize the JSON message
         message_data = json.loads(message.body.decode("utf-8"))
@@ -44,6 +44,8 @@ async def callback(message: aio_pika.IncomingMessage, ack_channel: aio_pika.chan
         print(f"Generation took {end - start}")
 
         # Acknowledge the message by sending a signal to the acknowledgment queue
+        connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
+        ack_channel = await connection.channel()
         await ack_channel.default_exchange.publish(
             aio_pika.Message(body=message.body),  # You can send a copy of the original message
             routing_key='acknowledgment_queue'
@@ -60,7 +62,7 @@ async def consume_audio_generation_tasks():
     channel = await connection.channel()
 
     queue = await channel.declare_queue("musicgen_queue", durable=False)
-    await queue.consume(lambda message: callback(message, channel))
+    await queue.consume(lambda message: callback(message))
 
     # Keep the consumer running
     await asyncio.Future()
