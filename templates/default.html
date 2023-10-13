@@ -9,12 +9,15 @@
     <div>musicgen</div>
     <form id="musicgenForm">
         <label for="text">Text:</label>
-        <input type="text" id="text" name="text" value="a light and cheerly EDM track, with syncopated drums, aery pads, and strong emotions bpm: 130" required>
+        <input type="text" id="text" name="text" value="a light and cheerly EDM track, with syncopated drums, airy pads, and strong emotions bpm: 130" required>
         <button type="button" onclick="submitForm()">Generate Music</button>
     </form>
     <div>
-        <a href="/list_generated_files">list previously generated music</a>
+        <a href="/list_generated_files">List previously generated music</a>
     </div>
+    
+    <!-- Display Queue Length -->
+    <div id="queueLength">Queue Length: Loading...</div>
 
     <script>
         function submitForm() {
@@ -38,6 +41,25 @@
                 console.error('Error:', error);
             });
         }
+
+        // Function to update the queue length
+        function updateQueueLength() {
+            fetch('/queue_length')
+            .then(response => response.json())
+            .then(data => {
+                // Update the HTML content with the queue length
+                document.getElementById("queueLength").innerText = 'Queue Length: ' + data.queue_length;
+            })
+            .catch(error => {
+                console.error('Error getting queue length:', error);
+            });
+        }
+
+        // Update the queue length on page load
+        updateQueueLength();
+
+        // Periodically update the queue length (every 5 seconds in this example)
+        setInterval(updateQueueLength, 5000);
     </script>
 </body>
 </html>
