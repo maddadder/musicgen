@@ -10,6 +10,13 @@
     <form id="musicgenForm">
         <label for="text">Text:</label>
         <input type="text" id="text" name="text" value="a light and cheerly EDM track, with syncopated drums, airy pads, and strong emotions bpm: 130" required>
+        <label for="duration">Duration:</label>
+        <input type="text" id="duration" name="duration" value="10" required>
+
+        <!-- Add file input for audio file -->
+        <label for="audio_file">Audio File:</label>
+        <input type="file" id="audio_file" name="audio_file" accept=".mp3" required>
+        
         <button type="button" onclick="submitForm()">Generate Music</button>
     </form>
     <div>
@@ -21,16 +28,21 @@
 
     <script>
         function submitForm() {
-            var formData = {
-                text: document.getElementById("text").value
-            };
+            // Create a FormData object to handle file uploads
+            var formData = new FormData();
+            
+            // Add text value to the form data
+            formData.append("text", document.getElementById("text").value);
+            
+            // Add duration value to the form data
+            formData.append("duration", document.getElementById("duration").value);
+
+            // Add audio file to the form data
+            formData.append("audio_file", document.getElementById("audio_file").files[0]);
 
             fetch('/musicgen', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
+                body: formData,
             })
             .then(response => response.json())
             .then(data => {

@@ -2,13 +2,15 @@ import os
 import uuid
 import time
 
-from fastapi import FastAPI, Form, Request, Query, HTTPException, status
+from fastapi import FastAPI, Form, Request, Query, HTTPException, status, File
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import asyncio
 import aio_pika
+import base64
+import json
 
 app = FastAPI()
 app.mount("/audio", StaticFiles(directory="audio"), name="audio")
@@ -68,19 +70,30 @@ class MusicGenRequest(BaseModel):
     text: str
 
 @app.post("/musicgen")
-async def musicgen(request: MusicGenRequest, response_class=HTMLResponse):
+async def musicgen(audio_file: bytes = File(...), text: str = Form(...), duration: str = Form(...), response_class=HTMLResponse):
     global rabbitmq_channel, queue_length
 
     if rabbitmq_channel is None:
         print("RabbitMQ channel not initialized.")
         return RedirectResponse("/list_generated_files", status_code=303)
 
-    queue_length += 1
+    # Base64 encode the file data
+    audio_file_base64 = base64.b64encode(audio_file).decode("utf-8")
+
+    # Create a dictionary with text, duration, and file data
+    message_data = {"text": text, "duration": duration, "audio_file": audio_file_base64}
+
+    # Convert the dictionary to a JSON string
+    json_message = json.dumps(message_data)
+
     # Use `await rabbitmq_channel.publish` instead of `rabbitmq_channel.basic_publish`
     await rabbitmq_channel.default_exchange.publish(
-        aio_pika.Message(body=request.text.encode("utf-8")),
+        aio_pika.Message(body=json_message.encode("utf-8")),
         routing_key='musicgen_queue'
     )
+    
+    # Update the queue length
+    queue_length += 1
     
     # Redirect to /list_generated_files
     return RedirectResponse("/list_generated_files", status_code=303)

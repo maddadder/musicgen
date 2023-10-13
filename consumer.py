@@ -6,15 +6,34 @@ from pydub import AudioSegment
 import os
 import uuid
 import time
+import torchaudio
+import json
+import base64
+from io import BytesIO
 
-model = MusicGen.get_pretrained('facebook/musicgen-large', device='cuda')
-model.set_generation_params(duration=12)
+model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
 
 async def callback(message: aio_pika.IncomingMessage, ack_channel: aio_pika.channel):
     async with message.process():
-        text = message.body.decode("utf-8")
+        # Deserialize the JSON message
+        message_data = json.loads(message.body.decode("utf-8"))
+        
+        text = message_data.get("text", "")
+        duration = int(message_data.get("duration", ""))
+        audio_file_base64 = message_data.get("audio_file", "")
+
+        model.set_generation_params(duration=duration)
+
+        # Base64 decode the file data
+        audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
         start = time.time()
-        wav = model.generate([text], progress=True)
+        melody_waveform, sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
+        wav = model.generate_with_chroma(
+            descriptions=[text],
+            melody_wavs=melody_waveform,
+            melody_sample_rate=sr,
+            progress=True
+        )
         wav = wav[0]
 
         save_path = f"audio/{uuid.uuid4()}"
