@@ -30,11 +30,22 @@ async def setup_rabbitmq():
     rabbitmq_channel = await rabbitmq_connection.channel()
     await rabbitmq_channel.set_qos(prefetch_count=1)
 
+    # Declare the exchange
+    await rabbitmq_channel.declare_exchange("test_exchange", type="direct")
+
     # Declare the queue
-    rabbitmq_queue = await rabbitmq_channel.declare_queue("musicgen_queue", durable=False)
+    rabbitmq_queue = await rabbitmq_channel.declare_queue("standard", durable=False)
+    # Bind the queue to the exchange
+    await rabbitmq_queue.bind("test_exchange", routing_key="standard_key")
+
+    # Declare the acknowledgment exchange
+    ack_exchange = await rabbitmq_channel.declare_exchange("ack_exchange", type="direct")
 
     # Declare the acknowledgment queue
     ack_queue = await rabbitmq_channel.declare_queue("acknowledgment_queue", durable=False)
+
+    # Bind the acknowledgment queue to the acknowledgment exchange
+    await ack_queue.bind(ack_exchange, routing_key="ack_key")
 
     # Set up the consumer to consume acknowledgment messages
     await ack_queue.consume(handle_acknowledgment)
@@ -87,9 +98,11 @@ async def musicgen(audio_file: bytes = File(...), text: str = Form(...), duratio
     json_message = json.dumps(message_data)
 
     # Use `await rabbitmq_channel.publish` instead of `rabbitmq_channel.basic_publish`
-    await rabbitmq_channel.default_exchange.publish(
+    # Use the correct exchange for publishing
+    exchange = await rabbitmq_channel.get_exchange("test_exchange")
+    await exchange.publish(
         aio_pika.Message(body=json_message.encode("utf-8")),
-        routing_key='musicgen_queue'
+        routing_key='standard_key'
     )
     
     # Update the queue length
