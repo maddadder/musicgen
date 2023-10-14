@@ -28,6 +28,30 @@ def convert_wav_to_mp3(wav_path):
     sound.export(mp3_path, format="mp3", bitrate="320k")
     os.remove(wav_path)
 
+def validate_input(message_data):
+    text = message_data.get("text", "")
+    duration = message_data.get("duration", "")
+    audio_file_base64 = message_data.get("audio_file", "")
+
+    if not text or not duration:
+        return False
+
+    try:
+        duration = int(duration)
+    except ValueError:
+        return False
+
+    if audio_file_base64:
+        decoded_content = base64.b64decode(audio_file_base64)
+        if not decoded_content:
+            return False
+        
+        decoded_content = decoded_content.decode("utf-8")
+        if decoded_content.strip() == "undefined":
+            return False
+
+    return True
+
 def ack_message(ch, delivery_tag):
     if ch.is_open:
         ch.basic_ack(delivery_tag)
@@ -59,29 +83,30 @@ def do_work(ch, delivery_tag, body):
     LOGGER.info('Thread id: %s Delivery tag: %s', thread_id, delivery_tag)
     message_data = json.loads(body.decode("utf-8"))
 
-    text = message_data.get("text", "")
-    duration = int(message_data.get("duration", ""))
-    audio_file_base64 = message_data.get("audio_file", "")
+    if validate_input(message_data):
+        text = message_data.get("text", "")
+        duration = int(message_data.get("duration", ""))
+        audio_file_base64 = message_data.get("audio_file", "")
 
-    model.set_generation_params(duration=duration)
+        model.set_generation_params(duration=duration)
 
-    audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
-    start = time.time()
-    melody_waveform, sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
-    wav = model.generate_with_chroma(
-        descriptions=[text],
-        melody_wavs=melody_waveform,
-        melody_sample_rate=sr,
-        progress=True
-    )
-    wav = wav[0]
+        audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
+        start = time.time()
+        melody_waveform, sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
+        wav = model.generate_with_chroma(
+            descriptions=[text],
+            melody_wavs=melody_waveform,
+            melody_sample_rate=sr,
+            progress=True
+        )
+        wav = wav[0]
 
-    save_path = f"audio/{uuid.uuid4()}"
-    print(f"Saving {save_path}")
-    audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
-    convert_wav_to_mp3(f'{save_path}.wav')
-    end = time.time()
-    print(f"Generation took {end - start}")
+        save_path = f"audio/{uuid.uuid4()}"
+        print(f"Saving {save_path}")
+        audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
+        convert_wav_to_mp3(f'{save_path}.wav')
+        end = time.time()
+        print(f"Generation took {end - start}")
     cb = functools.partial(ack_message, ch, delivery_tag)
     ch.connection.add_callback_threadsafe(cb)
 
