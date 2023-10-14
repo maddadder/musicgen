@@ -13,6 +13,7 @@ import threading
 import pika
 from pika.exchange_type import ExchangeType
 from io import BytesIO
+import binascii
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
