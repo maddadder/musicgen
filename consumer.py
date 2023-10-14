@@ -14,8 +14,6 @@ import pika
 from pika.exchange_type import ExchangeType
 from io import BytesIO
 
-model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
-
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
@@ -91,6 +89,7 @@ def do_work(ch, delivery_tag, body):
             duration = int(message_data.get("duration", ""))
             audio_file_base64 = message_data.get("audio_file", "")
 
+            model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
             model.set_generation_params(duration=duration)
 
             audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
