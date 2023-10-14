@@ -1,0 +1,14 @@
+# /etc/systemd/system/musicgen.service
+
+[Unit]
+Description=musicgen
+After=network.target
+
+[Service]
+ExecStart=/home/alice/git3/musicgen/app.sh
+WorkingDirectory=/home/alice/git3/musicgen
+Restart=always
+User=alice
+
+[Install]
+WantedBy=multi-user.target
