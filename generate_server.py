@@ -126,6 +126,8 @@ async def results(request: Request, generated_files: list):
 @app.get("/list_generated_files", response_class=HTMLResponse)
 async def list_generated_files(request: Request):
     generated_files = [f for f in os.listdir("audio") if f.endswith((".mp3", ".txt"))]
+    # Sort the files by filename
+    generated_files = sorted(generated_files)
     return templates.TemplateResponse("list_files.html", {"request": request, "generated_files": generated_files})
 
 @app.get("/", response_class=HTMLResponse)
