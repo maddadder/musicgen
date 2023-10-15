@@ -108,6 +108,8 @@ def do_work(ch, delivery_tag, body):
             print(f"Saving {save_path}")
             audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
             convert_wav_to_mp3(f'{save_path}.wav')
+            with open(save_path + '.txt', 'w') as file:
+                file.write(text)
             end = time.time()
             print(f"Generation took {end - start}")
     except Exception as e:
