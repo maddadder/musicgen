@@ -31,12 +31,18 @@ async def setup_rabbitmq():
     await rabbitmq_channel.set_qos(prefetch_count=1)
 
     # Declare the exchange
-    await rabbitmq_channel.declare_exchange("test_exchange", type="direct")
+    await rabbitmq_channel.declare_exchange("standard_exchange", type="direct")
+    await rabbitmq_channel.declare_exchange("irq_exchange", type="direct")
 
     # Declare the queue
     rabbitmq_queue = await rabbitmq_channel.declare_queue("standard", durable=False)
     # Bind the queue to the exchange
-    await rabbitmq_queue.bind("test_exchange", routing_key="standard_key")
+    await rabbitmq_queue.bind("standard_exchange", routing_key="standard_key")
+
+     # Declare the queue
+    rabbitmq_irq = await rabbitmq_channel.declare_queue("irq", durable=False)
+    # Bind the queue to the exchange
+    await rabbitmq_irq.bind("irq_exchange", routing_key="irq_key")
 
     # Declare the acknowledgment exchange
     ack_exchange = await rabbitmq_channel.declare_exchange("ack_exchange", type="direct")
@@ -80,8 +86,24 @@ def convert_wav_to_mp3(wav_path):
 class MusicGenRequest(BaseModel):
     text: str
 
+@app.post("/interrupt")
+async def interrupt(response_class=HTMLResponse):
+
+    message_data = {}
+    json_message = json.dumps(message_data)
+
+    exchange = await rabbitmq_channel.get_exchange("irq_exchange")
+    await exchange.publish(
+        aio_pika.Message(body=json_message.encode("utf-8")),
+        routing_key='irq_key'
+    )
+    return JSONResponse(content={"status": "success", "message": "irq successful"})
+
 @app.post("/musicgen")
-async def musicgen(audio_file: bytes = File(...), text: str = Form(...), duration: str = Form(...), response_class=HTMLResponse):
+async def musicgen(audio_file: bytes = File(...), 
+                   text: str = Form(...), 
+                   duration: str = Form(...), 
+                   response_class=HTMLResponse):
     global rabbitmq_channel, queue_length
 
     if rabbitmq_channel is None:
@@ -97,19 +119,15 @@ async def musicgen(audio_file: bytes = File(...), text: str = Form(...), duratio
     # Convert the dictionary to a JSON string
     json_message = json.dumps(message_data)
 
-    # Use `await rabbitmq_channel.publish` instead of `rabbitmq_channel.basic_publish`
-    # Use the correct exchange for publishing
-    exchange = await rabbitmq_channel.get_exchange("test_exchange")
+    exchange = await rabbitmq_channel.get_exchange("standard_exchange")
     await exchange.publish(
         aio_pika.Message(body=json_message.encode("utf-8")),
         routing_key='standard_key'
     )
-    
     # Update the queue length
     queue_length += 1
-    
-    # Redirect to /list_generated_files
-    return RedirectResponse("/list_generated_files", status_code=303)
+    return JSONResponse(content={"status": "success", "message": "Music generation successful"})
+
 
 @app.get("/queue_length", response_class=JSONResponse)
 async def get_queue_length():

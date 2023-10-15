@@ -18,6 +18,7 @@
         <input type="file" id="audio_file" name="audio_file" accept=".mp3" required>
         
         <button type="button" onclick="submitForm()">Generate Music</button>
+        <button type="button" onclick="interrupt()">Interrupt</button>
     </form>
     <div>
         <a href="/list_generated_files">List previously generated music</a>
@@ -43,6 +44,21 @@
             fetch('/musicgen', {
                 method: 'POST',
                 body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Handle the response as needed
+                console.log(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Function to interrupt the process
+        function interrupt() {
+            fetch('/interrupt', {
+                method: 'POST',
             })
             .then(response => response.json())
             .then(data => {
