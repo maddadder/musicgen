@@ -66,25 +66,21 @@ async def handle_acknowledgment(message: aio_pika.IncomingMessage):
         # Decrement the queue length
         queue_length -= 1
         acknowledgment_status = json.loads(message.body.decode("utf-8"))
+        audio_data_base64 = acknowledgment_status.get("audio_data", "")
+
+        if audio_data_base64:
+            decoded_content = base64.b64decode(audio_data_base64)
+            # Save the audio file to disk
+            save_path = f"audio/{uuid.uuid4()}.mp3"
+            with open(save_path, "wb") as audio_file:
+                audio_file.write(decoded_content)
+        acknowledgment_status['audio_data'] = None
 
 # Get the connection, channel, and queue in the application startup event
 @app.on_event("startup")
 async def startup_event():
     print('startup_event has occurred')
     await setup_rabbitmq()
-
-def convert_wav_to_mp3(wav_path):
-    # Determine the MP3 file path
-    mp3_path = os.path.splitext(wav_path)[0] + ".mp3"
-
-    # Load the WAV file
-    sound = AudioSegment.from_wav(wav_path)
-
-    # Export as MP3
-    sound.export(mp3_path, format="mp3", bitrate="320k")
-
-    # Delete the WAV file
-    os.remove(wav_path)
 
 class MusicGenRequest(BaseModel):
     text: str

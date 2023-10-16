@@ -14,6 +14,7 @@ import pika
 from pika.exchange_type import ExchangeType
 from io import BytesIO
 import binascii
+import io
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -47,12 +48,6 @@ def on_message(ch, method_frame, _header_frame, body, args):
     t = threading.Thread(target=do_work, args=(ch, delivery_tag, body))
     t.start()
     thrds.append(t)
-
-def convert_wav_to_mp3(wav_path):
-    mp3_path = os.path.splitext(wav_path)[0] + ".mp3"
-    sound = AudioSegment.from_wav(wav_path)
-    sound.export(mp3_path, format="mp3", bitrate="320k")
-    os.remove(wav_path)
 
 def validate_input(message_data):
     text = message_data.get("text", "")
@@ -112,7 +107,7 @@ def do_work(ch, delivery_tag, body):
     thread_id = threading.get_ident()
     LOGGER.info('Thread id: %s Delivery tag: %s', thread_id, delivery_tag)
     message_data = json.loads(body.decode("utf-8"))
-    result = "success"
+    acknowledgment_body = json.dumps({"status": "completed", "result": "success", "task_id": message_data.get("task_id")})
     try:
         if validate_input(message_data):
             text = message_data.get("text", "")
@@ -146,29 +141,34 @@ def do_work(ch, delivery_tag, body):
                 )
             wav = wav[0]
 
-            save_path = f"audio/{uuid.uuid4()}"
-            print(f"Saving {save_path}")
-            audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
-            convert_wav_to_mp3(f'{save_path}.wav')
-            if text != None:
-                with open(save_path + '.txt', 'w') as file:
-                    file.write(text)
+            buffer = io.BytesIO()
+            torchaudio.save(buffer, wav.cpu(), model.sample_rate, format="mp3")
+
+            # Read the content of the in-memory buffer
+            buffer.seek(0)
+            audio_data_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+            # Publish acknowledgment with the audio data
+            acknowledgment_body = json.dumps({
+                "status": "completed",
+                "result": "Generation successful",
+                "task_id": message_data.get("task_id"),
+                "audio_data": audio_data_base64,
+                "text": text
+            })
             end = time.time()
             print(f"Generation took {end - start}")
     except Exception as e:
         # Handle the exception (e.g., log it)
         LOGGER.error(f"An error occurred: {e}")
         result = f"An error occurred: {e}"
+        acknowledgment_body = json.dumps({"status": "completed", "result": result, "task_id": message_data.get("task_id")})
     INTERRUPTING = False
     cb = functools.partial(ack_message, ch, delivery_tag)
     ch.connection.add_callback_threadsafe(cb)
 
     # Publish acknowledgment
-    acknowledgment_body = json.dumps({"status": "completed", "result": result, "task_id": message_data.get("task_id")})
     publish_acknowledgment(acknowledgment_body)
-
-
-
 
 credentials = pika.PlainCredentials('guest', 'guest')
 parameters = pika.ConnectionParameters(
