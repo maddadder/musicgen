@@ -23,6 +23,7 @@ rabbitmq_channel = None
 rabbitmq_queue = None
 ack_queue = None  # New variable to store acknowledgment queue
 queue_length = 0
+acknowledgment_status = {"status": "idle", "result": ""}
 
 # Connection to RabbitMQ using aio-pika
 async def setup_rabbitmq():
@@ -60,10 +61,11 @@ async def setup_rabbitmq():
     queue_length = rabbitmq_queue.declaration_result.message_count  # Initial queue length
 
 async def handle_acknowledgment(message: aio_pika.IncomingMessage):
-    global queue_length
+    global queue_length, acknowledgment_status
     async with message.process():
         # Decrement the queue length
         queue_length -= 1
+        acknowledgment_status = json.loads(message.body.decode("utf-8"))
 
 # Get the connection, channel, and queue in the application startup event
 @app.on_event("startup")
@@ -105,7 +107,7 @@ async def musicgen(audio_file: bytes = File(...),
                    text: Optional[str] = Form(None),
                    duration: str = Form(...), 
                    response_class=HTMLResponse):
-    global rabbitmq_channel, queue_length
+    global rabbitmq_channel, queue_length, acknowledgment_status
 
     if rabbitmq_channel is None:
         print("RabbitMQ channel not initialized.")
@@ -127,6 +129,7 @@ async def musicgen(audio_file: bytes = File(...),
     )
     # Update the queue length
     queue_length += 1
+    acknowledgment_status = {"status": "running", "result": "Loading..."}
     return JSONResponse(content={"status": "success", "message": "Music generation successful"})
 
 
@@ -134,6 +137,12 @@ async def musicgen(audio_file: bytes = File(...),
 async def get_queue_length():
     global queue_length
     return {"queue_length": queue_length} 
+
+# Endpoint to get the acknowledgment status
+@app.get("/acknowledgment_status", response_class=JSONResponse)
+async def get_acknowledgment_status():
+    global acknowledgment_status
+    return acknowledgment_status
 
 # HTML template to display results
 @app.get("/results", response_class=HTMLResponse)

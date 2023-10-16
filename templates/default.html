@@ -26,6 +26,7 @@
     
     <!-- Display Queue Length -->
     <div id="queueLength">Queue Length: Loading...</div>
+    <div id="acknowledgmentResult">Result: Loading...</div>
 
     <script>
         function submitForm() {
@@ -88,6 +89,29 @@
 
         // Periodically update the queue length (every 5 seconds in this example)
         setInterval(updateQueueLength, 5000);
+
+
+
+        // Function to update the acknowledgment status
+        function updateAcknowledgmentStatus() {
+            fetch('/acknowledgment_status')
+            .then(response => response.json())
+            .then(data => 
+            {
+                const resultElement = document.getElementById("acknowledgmentResult");
+                resultElement.innerText = `Result: ${data.result}`;
+            })
+            .catch(error => {
+                console.error('Error getting acknowledgment status:', error);
+            });
+        }
+
+        // Update the acknowledgment status on page load
+        updateAcknowledgmentStatus();
+
+        // Periodically update the acknowledgment status (every 5 seconds in this example)
+        setInterval(updateAcknowledgmentStatus, 5000);
+
     </script>
 </body>
 </html>

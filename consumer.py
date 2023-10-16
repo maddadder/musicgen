@@ -112,7 +112,7 @@ def do_work(ch, delivery_tag, body):
     thread_id = threading.get_ident()
     LOGGER.info('Thread id: %s Delivery tag: %s', thread_id, delivery_tag)
     message_data = json.loads(body.decode("utf-8"))
-
+    result = "success"
     try:
         if validate_input(message_data):
             text = message_data.get("text", "")
@@ -157,13 +157,14 @@ def do_work(ch, delivery_tag, body):
             print(f"Generation took {end - start}")
     except Exception as e:
         # Handle the exception (e.g., log it)
-        print(f"An error occurred: {e}")
+        LOGGER.error(f"An error occurred: {e}")
+        result = f"An error occurred: {e}"
     INTERRUPTING = False
     cb = functools.partial(ack_message, ch, delivery_tag)
     ch.connection.add_callback_threadsafe(cb)
 
     # Publish acknowledgment
-    acknowledgment_body = json.dumps({"status": "completed", "task_id": message_data.get("task_id")})
+    acknowledgment_body = json.dumps({"status": "completed", "result": result, "task_id": message_data.get("task_id")})
     publish_acknowledgment(acknowledgment_body)
 
 
