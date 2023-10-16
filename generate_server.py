@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 import uuid
 import time
 
@@ -101,7 +102,7 @@ async def interrupt(response_class=HTMLResponse):
 
 @app.post("/musicgen")
 async def musicgen(audio_file: bytes = File(...), 
-                   text: str = Form(...), 
+                   text: Optional[str] = Form(None),
                    duration: str = Form(...), 
                    response_class=HTMLResponse):
     global rabbitmq_channel, queue_length

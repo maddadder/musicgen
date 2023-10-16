@@ -59,7 +59,7 @@ def validate_input(message_data):
     duration = message_data.get("duration", "")
     audio_file_base64 = message_data.get("audio_file", "")
 
-    if not text or not duration:
+    if not duration:
         return False
 
     try:
@@ -129,20 +129,30 @@ def do_work(ch, delivery_tag, body):
             audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
             start = time.time()
             melody_waveform, sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
-            wav = model.generate_with_chroma(
-                descriptions=[text],
-                melody_wavs=melody_waveform,
-                melody_sample_rate=sr,
-                progress=True
-            )
+            
+            if(text == None):
+                wav = model.generate_continuation(
+                    prompt=melody_waveform,
+                    prompt_sample_rate=sr,
+                    progress=True
+                )
+            else:
+                descriptions = [text]
+                wav = model.generate_with_chroma(
+                    descriptions=descriptions,
+                    melody_wavs=melody_waveform,
+                    melody_sample_rate=sr,
+                    progress=True
+                )
             wav = wav[0]
 
             save_path = f"audio/{uuid.uuid4()}"
             print(f"Saving {save_path}")
             audio_write(f'{save_path}', wav.cpu(), model.sample_rate, strategy="loudness")
             convert_wav_to_mp3(f'{save_path}.wav')
-            with open(save_path + '.txt', 'w') as file:
-                file.write(text)
+            if text != None:
+                with open(save_path + '.txt', 'w') as file:
+                    file.write(text)
             end = time.time()
             print(f"Generation took {end - start}")
     except Exception as e:
