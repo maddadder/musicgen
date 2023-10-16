@@ -31,7 +31,7 @@ mkdir audio
 4. Deploy as a service
 
 ```bash
-chmod +x app.sh
+chmod +x generator/app.sh
 sudo cp musicgen.service /etc/systemd/system/musicgen.service
 sudo systemctl daemon-reload
 sudo systemctl start musicgen

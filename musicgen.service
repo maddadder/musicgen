@@ -5,8 +5,8 @@ Description=musicgen
 After=network.target
 
 [Service]
-ExecStart=/home/alice/git3/musicgen/app.sh
-WorkingDirectory=/home/alice/git3/musicgen
+ExecStart=/home/alice/git3/musicgen/generator/app.sh
+WorkingDirectory=/home/alice/git3/musicgen/generator
 Restart=always
 User=alice
 
