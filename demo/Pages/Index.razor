@@ -60,20 +60,37 @@
 <ul>
     @foreach (var fileName in FileNames)
     {
-        <li><a target="_blank" href="audio/@fileName">@fileName</a></li>
+        <li>
+            <input type="checkbox" id="@($"checkbox_{fileName}")" @onchange="@(e => ToggleCheckbox(e, fileName))" />
+            <label for="@($"checkbox_{fileName}")">
+                <a target="_blank" href="audio/@fileName">@fileName</a>
+            </label>
+        </li>
     }
 </ul>
+
+<h3>Selected Files</h3>
+<ul>
+    @foreach (var filename in SelectedFiles)
+    {
+        <li>@filename</li>
+    }
+</ul>
+<button @onclick="DeleteSelectedFiles">Delete Selected</button>
+
 
 
 
 @code {
+    private int queueLength = 0;
     private string text;
     private string duration;
     private IBrowserFile file;
     private List<string> messages = new List<string>();
     private HubConnection _hubConnection;
     private List<string?> FileNames { get; set; } = new List<string?>();
-    private int queueLength = 0;
+    private List<string> SelectedFiles { get; set; } = new List<string>();
+
     private async Task SendInterrupt()
     {
         RabbitMqService.SendInterrupt();
@@ -139,5 +156,39 @@
     }
     
 
+    private void ToggleCheckbox(ChangeEventArgs e, string fileName)
+    {
+        if (SelectedFiles.Contains(fileName))
+        {
+            SelectedFiles.Remove(fileName);
+        }
+        else
+        {
+            SelectedFiles.Add(fileName);
+        }
+    }
 
+    private void DeleteSelectedFiles()
+    {
+        foreach (var fileName in SelectedFiles)
+        {
+            var filePath = $"audio/{fileName}"; // Adjust the path based on your project structure
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    FileNames.Remove(fileName); // Remove the file from the list
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any exceptions during file deletion
+                Console.WriteLine($"Error deleting file {fileName}: {ex.Message}");
+            }
+        }
+
+        SelectedFiles.Clear(); // Clear the list of selected files after deletion
+    }
 }

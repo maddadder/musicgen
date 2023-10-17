@@ -18,5 +18,5 @@ docker compose down
 ```
 2. If you are debugging you can use
 ```bash
-docker-compose up --remove-orphans
+docker compose up --remove-orphans
 ```

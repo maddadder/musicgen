@@ -12,6 +12,10 @@ a, .btn-link {
     color: #0071c1;
 }
 
+a:visited {
+    color: #800080; /* Color for visited links */
+}
+
 .btn-primary {
     color: #fff;
     background-color: #1b6ec2;
