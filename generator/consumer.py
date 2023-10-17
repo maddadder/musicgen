@@ -20,19 +20,19 @@ LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
 LOGGER = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.ERROR, format=LOG_FORMAT)
+logging.basicConfig(level=logging.WARN, format=LOG_FORMAT)
 
 INTERRUPTING = False
 
 def interrupt(ch, delivery_tag, body):
     global INTERRUPTING
-    print("interrupt called")
+    LOGGER.warning("interrupt called")
     INTERRUPTING = True
     cb = functools.partial(ack_message, ch, delivery_tag)
     ch.connection.add_callback_threadsafe(cb)
 
 def on_irq_message(ch, method_frame, _header_frame, body, args):
-    print('on_irq_message called')
+    LOGGER.warning('on_irq_message called')
     thrds = args
     delivery_tag = method_frame.delivery_tag
 
@@ -41,7 +41,7 @@ def on_irq_message(ch, method_frame, _header_frame, body, args):
     thrds.append(t)
 
 def on_message(ch, method_frame, _header_frame, body, args):
-    print("on_message called")
+    LOGGER.info("on_message called")
     thrds = args
     delivery_tag = method_frame.delivery_tag
         
@@ -55,12 +55,14 @@ def validate_input(message_data):
     audio_file_base64 = message_data.get("audio_file", "")
 
     if not duration:
-        return False
+        LOGGER.warning("duration is invalid")
+        return False, "duration is invalid"
 
     try:
         duration = int(duration)
     except ValueError:
-        return False
+        LOGGER.warning("duration is invalid")
+        return False, "duration is invalid"
 
     if audio_file_base64:
         try:
@@ -68,12 +70,14 @@ def validate_input(message_data):
 
             # Check if the decoded content is larger than the specified size
             if len(decoded_content) < 1024:
-                return False
+                LOGGER.warning("decoded_content is invalid")
+                return False, "decoded_content is invalid"
 
         except (UnicodeDecodeError, binascii.Error):
-            return False
+            LOGGER.warning("decoded_content is invalid")
+            return False, "decoded_content is invalid"
 
-    return True
+    return True, ""
 
 def ack_message(ch, delivery_tag):
     if ch.is_open:
@@ -83,7 +87,7 @@ def ack_message(ch, delivery_tag):
 
 def publish_acknowledgment(body):
     connection_params = pika.ConnectionParameters(
-        'localhost', credentials=pika.PlainCredentials('guest', 'guest'), heartbeat=5
+        'rabbitmq', credentials=pika.PlainCredentials('guest', 'guest'), heartbeat=5
     )
     with pika.BlockingConnection(connection_params) as ack_connection:
         ack_channel = ack_connection.channel()
@@ -103,13 +107,15 @@ def publish_acknowledgment(body):
         
 def do_work(ch, delivery_tag, body):
     global INTERRUPTING
-    print("do_work called")
+    LOGGER.warning("do_work called")
     thread_id = threading.get_ident()
-    LOGGER.info('Thread id: %s Delivery tag: %s', thread_id, delivery_tag)
+    LOGGER.warning('Thread id: %s Delivery tag: %s', thread_id, delivery_tag)
     message_data = json.loads(body.decode("utf-8"))
+    
     acknowledgment_body = json.dumps({"status": "completed", "result": "success", "task_id": message_data.get("task_id")})
     try:
-        if validate_input(message_data):
+        isvalid, validation_result = validate_input(message_data)
+        if isvalid:
             text = message_data.get("text", "")
             duration = int(message_data.get("duration", ""))
             audio_file_base64 = message_data.get("audio_file", "")
@@ -117,7 +123,7 @@ def do_work(ch, delivery_tag, body):
             model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
             model.set_generation_params(duration=duration)
             def _progress(generated, to_generate):
-                #print(generated, to_generate)
+                #LOGGER.info('generated %s',generated)
                 if INTERRUPTING:
                     raise Exception("INTERRUPTED")
             model.set_custom_progress_callback(_progress)
@@ -158,11 +164,25 @@ def do_work(ch, delivery_tag, body):
             })
             end = time.time()
             print(f"Generation took {end - start}")
+        else:
+            acknowledgment_body = json.dumps({
+                "status": "completed",
+                "result": validation_result,
+                "task_id": message_data.get("task_id"),
+                "audio_data": "",
+                "text": ""
+            })
     except Exception as e:
         # Handle the exception (e.g., log it)
         LOGGER.error(f"An error occurred: {e}")
         result = f"An error occurred: {e}"
-        acknowledgment_body = json.dumps({"status": "completed", "result": result, "task_id": message_data.get("task_id")})
+        acknowledgment_body = json.dumps({
+                "status": "completed",
+                "result": result,
+                "task_id": message_data.get("task_id"),
+                "audio_data": "",
+                "text": ""
+            })
     INTERRUPTING = False
     cb = functools.partial(ack_message, ch, delivery_tag)
     ch.connection.add_callback_threadsafe(cb)
@@ -172,7 +192,11 @@ def do_work(ch, delivery_tag, body):
 
 credentials = pika.PlainCredentials('guest', 'guest')
 parameters = pika.ConnectionParameters(
-    'localhost', credentials=credentials, heartbeat=5)
+    'rabbitmq',
+    port=5672,
+    credentials=credentials,
+    heartbeat=5,
+)
 
 with pika.BlockingConnection(parameters) as connection:
     channel = connection.channel()

@@ -1,6 +1,7 @@
 # musicgen
 
 1. Create environment
+sudo apt install nvidia-docker2
 ```bash
 conda create --name audio python=3.9
 #conda deactivate

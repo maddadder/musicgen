@@ -28,7 +28,7 @@ acknowledgment_status = {"status": "idle", "result": ""}
 # Connection to RabbitMQ using aio-pika
 async def setup_rabbitmq():
     global rabbitmq_connection, rabbitmq_channel, rabbitmq_queue, queue_length, ack_queue
-    rabbitmq_connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
+    rabbitmq_connection = await aio_pika.connect_robust("amqp://guest:guest@rabbitmq/")
     rabbitmq_channel = await rabbitmq_connection.channel()
     await rabbitmq_channel.set_qos(prefetch_count=1)
 

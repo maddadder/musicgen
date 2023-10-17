@@ -1,0 +1,42 @@
+version: '3'
+
+services:
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    ports:
+      - "5672:5672"   # RabbitMQ default port
+      - "15672:15672" # RabbitMQ management plugin
+    networks:
+      - mynetwork
+
+  dotnetapp:
+    build:
+      context: ./demo
+      dockerfile: ./Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+    ports:
+      - "5001:80"  # Adjust port mapping as needed
+    networks:
+      - mynetwork
+
+  pythonconsumer:
+    build:
+      context: ./generator
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+    networks:
+      - mynetwork
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ gpu ]
+networks:
+  mynetwork:
