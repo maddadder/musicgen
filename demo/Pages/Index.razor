@@ -136,11 +136,7 @@
 
         // Retrieve MP3 file names from the server
         var folderPath = Path.Combine(WebHostEnvironment.ContentRootPath, "audio");
-        FileNames = Directory.GetFiles(folderPath, "*.*")
-                             .Where(file => file.EndsWith(".mp3") || file.EndsWith(".txt"))
-                             .Select(Path.GetFileName)
-                             .ToList().Select(x => new CheckboxItem{ FileName = x, isChecked = false })
-                             .ToList();
+        FileNames = getFiles();
         SelectedFiles.Clear();
         await base.OnInitializedAsync();
     }
@@ -148,18 +144,22 @@
     {
         queueLength -= 1;
         messages.Add(message);
-        // Retrieve MP3 file names from the server
-        var folderPath = Path.Combine(WebHostEnvironment.ContentRootPath, "audio");
-        FileNames = Directory.GetFiles(folderPath, "*.*")
-                             .Where(file => file.EndsWith(".mp3") || file.EndsWith(".txt"))
-                             .Select(Path.GetFileName)
-                             .ToList().Select(x => new CheckboxItem{ FileName = x, isChecked = false })
-                             .ToList();
+        FileNames = getFiles();
         SelectedFiles.Clear();
         // Inform blazor the UI needs updating
         InvokeAsync(StateHasChanged);
     }
-    
+    private List<CheckboxItem> getFiles()
+    {
+        // Retrieve MP3 file names from the server
+        var folderPath = Path.Combine(WebHostEnvironment.ContentRootPath, "audio");
+        return Directory.GetFiles(folderPath, "*.*")
+                        .Where(file => file.EndsWith(".mp3") || file.EndsWith(".txt"))
+                        .Select(Path.GetFileName)
+                        .OrderBy(x => x)
+                        .ToList().Select(x => new CheckboxItem{ FileName = x, isChecked = false })
+                        .ToList();
+    }
 
     private void ToggleCheckbox(ChangeEventArgs e, int index)
     {
