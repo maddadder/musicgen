@@ -107,9 +107,16 @@
     {
         if (file != null)
         {
-            var audioFileContent = await FileUploadService.SaveFile(file);
-            RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
-            queueLength += 1;
+            if (file.Size > FileUploadServiceHelper.MAXALLOWEDSIZE)
+            {
+                messages.Add($"File size exceeds the maximum allowed size in bytes: {FileUploadServiceHelper.MAXALLOWEDSIZE}");
+            }
+            else
+            {
+                var audioFileContent = await FileUploadService.SaveFile(file);
+                RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
+                queueLength += 1;
+            }
         }
         else
         {
