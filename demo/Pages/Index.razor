@@ -39,7 +39,7 @@
         </td>
         <td>
            <button @onclick="GenerateMusic">Generate Music</button>
-           <button @onclick="SendInterrupt">Send Interrupt</button>
+           <button @onclick="SendInterrupt">Interrupt</button>
         </td>
     </tr>
 </table>
@@ -58,12 +58,14 @@
 <h3>Files List</h3>
 
 <ul>
-    @foreach (var fileName in FileNames)
+    @for (var i = 0; i < FileNames.Count; i++)
     {
+        int index = i;
+        var item = FileNames[index];
         <li>
-            <input type="checkbox" id="@($"checkbox_{fileName}")" @onchange="@(e => ToggleCheckbox(e, fileName))" />
-            <label for="@($"checkbox_{fileName}")">
-                <a target="_blank" href="audio/@fileName">@fileName</a>
+            <input type="checkbox" id="@($"checkbox_{item.FileName}")" checked="@item.isChecked" @onchange="@(e => ToggleCheckbox(e, index))" />
+            <label for="@($"checkbox_{item.FileName}")">
+                <a target="_blank" href="audio/@item.FileName">@item.FileName</a>
             </label>
         </li>
     }
@@ -71,9 +73,9 @@
 
 <h3>Selected Files</h3>
 <ul>
-    @foreach (var filename in SelectedFiles)
+    @foreach (var item in SelectedFiles)
     {
-        <li>@filename</li>
+        <li>@item.FileName</li>
     }
 </ul>
 <button @onclick="DeleteSelectedFiles">Delete Selected</button>
@@ -88,9 +90,9 @@
     private IBrowserFile file;
     private List<string> messages = new List<string>();
     private HubConnection _hubConnection;
-    private List<string?> FileNames { get; set; } = new List<string?>();
-    private List<string> SelectedFiles { get; set; } = new List<string>();
-
+    private List<CheckboxItem> FileNames { get; set; } = new List<CheckboxItem>();
+    private List<CheckboxItem> SelectedFiles { get; set; } = new List<CheckboxItem>();
+    
     private async Task SendInterrupt()
     {
         RabbitMqService.SendInterrupt();
@@ -137,8 +139,9 @@
         FileNames = Directory.GetFiles(folderPath, "*.*")
                              .Where(file => file.EndsWith(".mp3") || file.EndsWith(".txt"))
                              .Select(Path.GetFileName)
+                             .ToList().Select(x => new CheckboxItem{ FileName = x, isChecked = false })
                              .ToList();
-
+        SelectedFiles.Clear();
         await base.OnInitializedAsync();
     }
     private void ReceiveMessage(string message)
@@ -150,42 +153,49 @@
         FileNames = Directory.GetFiles(folderPath, "*.*")
                              .Where(file => file.EndsWith(".mp3") || file.EndsWith(".txt"))
                              .Select(Path.GetFileName)
+                             .ToList().Select(x => new CheckboxItem{ FileName = x, isChecked = false })
                              .ToList();
+        SelectedFiles.Clear();
         // Inform blazor the UI needs updating
         InvokeAsync(StateHasChanged);
     }
     
 
-    private void ToggleCheckbox(ChangeEventArgs e, string fileName)
+    private void ToggleCheckbox(ChangeEventArgs e, int index)
     {
-        if (SelectedFiles.Contains(fileName))
+        bool isChecked = (bool)e.Value;
+
+        if (isChecked && !SelectedFiles.Contains(FileNames[index]))
         {
-            SelectedFiles.Remove(fileName);
+            SelectedFiles.Add(FileNames[index]);
         }
-        else
+        else if (!isChecked && SelectedFiles.Contains(FileNames[index]))
         {
-            SelectedFiles.Add(fileName);
+            SelectedFiles.Remove(FileNames[index]);
         }
+
+        FileNames[index].isChecked = isChecked;
     }
 
     private void DeleteSelectedFiles()
     {
-        foreach (var fileName in SelectedFiles)
+        for (var i = SelectedFiles.Count - 1; i >= 0; i--)
         {
-            var filePath = $"audio/{fileName}"; // Adjust the path based on your project structure
+            var item = SelectedFiles[i];
+            var filePath = $"audio/{item.FileName}";
 
             try
             {
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
-                    FileNames.Remove(fileName); // Remove the file from the list
+                    FileNames.Remove(item); // Remove the file from the list
                 }
             }
             catch (Exception ex)
             {
                 // Handle any exceptions during file deletion
-                Console.WriteLine($"Error deleting file {fileName}: {ex.Message}");
+                Console.WriteLine($"Error deleting file {filePath}: {ex.Message}");
             }
         }
 
