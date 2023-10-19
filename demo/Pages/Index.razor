@@ -45,7 +45,7 @@
 </table>
 
 <div>&#160;</div>
-<div>Queue Legth: @queueLength</div>
+<div>Requests waiting in queue: @RabbitMqService.InitialQueueLength</div>
 <div>&#160;</div>
 <h3>Status</h3>
 <ul>
@@ -83,8 +83,8 @@
 
 
 
-@code {
-    private int queueLength = 0;
+@code 
+{
     private string text;
     private string duration;
     private IBrowserFile file;
@@ -134,8 +134,12 @@
             }
         }
         RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
-        queueLength += 1;
         messages.Add("attempting to generate song");
+
+        // Wait for the RabbitMqService queue to perist the message
+        await Task.Delay(1000);
+        // Inform blazor the UI needs updating
+        await InvokeAsync(StateHasChanged);
     }
     
 
@@ -161,14 +165,13 @@
         SelectedFiles.Clear();
         await base.OnInitializedAsync();
     }
-    private void ReceiveMessage(string message)
+    private async void ReceiveMessage(string message)
     {
-        queueLength -= 1;
         messages.Add(message);
         FileNames = getFiles();
         SelectedFiles.Clear();
         // Inform blazor the UI needs updating
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
     private List<CheckboxItem> getFiles()
     {
