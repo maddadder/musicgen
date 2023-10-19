@@ -14,7 +14,7 @@
             <label for="fileInput">Upload Audio File:</label>
         </td>
         <td>
-            <InputFile id="fileInput" OnChange="HandleFileUpload" />
+            <InputFile id="fileInput" OnChange="HandleFileUpload" accept=".mp3" />
         </td>
     </tr>
     <tr>
@@ -96,32 +96,46 @@
     private async Task SendInterrupt()
     {
         RabbitMqService.SendInterrupt();
+        messages.Add("interrupt sent");
     }
     
     private async Task HandleFileUpload(InputFileChangeEventArgs e)
     {
-        file = e.File;
-    }
+        if (e.File != null)
+        {
+            // Check if the file has a valid extension
+            var allowedExtensions = new[] { ".mp3" };
+            var extension = Path.GetExtension(e.File.Name).ToLowerInvariant();
 
+            if (!allowedExtensions.Contains(extension))
+            {
+                messages.Add("Invalid file type. Please upload an MP3 file.");
+                return;
+            }
+            else
+            {
+                file = e.File;
+            }
+        }
+    }
     private async Task GenerateMusic()
     {
+        string audioFileContent = string.Empty;
         if (file != null)
         {
             if (file.Size > FileUploadServiceHelper.MAXALLOWEDSIZE)
             {
                 messages.Add($"File size exceeds the maximum allowed size in bytes: {FileUploadServiceHelper.MAXALLOWEDSIZE}");
+                return;
             }
             else
             {
-                var audioFileContent = await FileUploadService.SaveFile(file);
-                RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
-                queueLength += 1;
+                audioFileContent = await FileUploadService.SaveFile(file);
             }
         }
-        else
-        {
-            // Handle case where no file is selected
-        }
+        RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
+        queueLength += 1;
+        messages.Add("attempting to generate song");
     }
     
 

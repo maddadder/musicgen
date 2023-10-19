@@ -54,6 +54,10 @@ def validate_input(message_data):
     duration = message_data.get("duration", "")
     audio_file_base64 = message_data.get("audio_file", "")
 
+    if not text and not audio_file_base64:
+        LOGGER.warning("text or file is required")
+        return False, "text or file is required"
+    
     if not duration:
         LOGGER.warning("duration is invalid")
         return False, "duration is invalid"
@@ -119,32 +123,41 @@ def do_work(ch, delivery_tag, body):
             text = message_data.get("text", "")
             duration = int(message_data.get("duration", ""))
             audio_file_base64 = message_data.get("audio_file", "")
-
-            model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
+            if not audio_file_base64:
+                LOGGER.warning("using facebook/musicgen-large")
+                model = MusicGen.get_pretrained('facebook/musicgen-large', device='cuda')
+            else:
+                LOGGER.warning("using facebook/musicgen-melody")
+                model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
             model.set_generation_params(duration=duration)
             def _progress(generated, to_generate):
                 #LOGGER.info('generated %s',generated)
                 if INTERRUPTING:
                     raise Exception("INTERRUPTED")
             model.set_custom_progress_callback(_progress)
-            audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
+            target_sr = 32000
+            melody_waveform = None
+            if audio_file_base64:
+                audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
+                melody_waveform, target_sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
             start = time.time()
-            melody_waveform, sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
-            
             if(text == None):
                 wav = model.generate_continuation(
                     prompt=melody_waveform,
-                    prompt_sample_rate=sr,
+                    prompt_sample_rate=target_sr,
                     progress=True
                 )
             else:
                 descriptions = [text]
-                wav = model.generate_with_chroma(
-                    descriptions=descriptions,
-                    melody_wavs=melody_waveform,
-                    melody_sample_rate=sr,
-                    progress=True
-                )
+                if melody_waveform == None:
+                    wav = model.generate(descriptions, progress=True)
+                else:
+                    wav = model.generate_with_chroma(
+                        descriptions=descriptions,
+                        melody_wavs=melody_waveform,
+                        melody_sample_rate=target_sr,
+                        progress=True
+                    )
             wav = wav[0]
 
             buffer = io.BytesIO()
