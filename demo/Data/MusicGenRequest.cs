@@ -12,4 +12,6 @@ public class MusicGenRequest
 
     [JsonPropertyName("audio_file")]
     public string AudioFile { get; set; }
+    [JsonPropertyName("speech2text")]
+    public bool Speech2Text { get; set; }
 }

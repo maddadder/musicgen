@@ -57,14 +57,8 @@ public class RabbitMqService
                               body: messageBody);
     }
 
-    public void SendMusicGenRequest(string text, string duration, string audio_file)
+    public void SendMusicGenRequest(MusicGenRequest request)
     {
-        var request = new MusicGenRequest
-        {
-            Text = text,
-            Duration = duration,
-            AudioFile = audio_file
-        };
 
         var jsonMessage = JsonSerializer.Serialize(request);
         var messageBody = Encoding.UTF8.GetBytes(jsonMessage);

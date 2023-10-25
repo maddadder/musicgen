@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.AspNetCore.SignalR
+@using demo.Data
 @inject RabbitMqService RabbitMqService
 @inject FileUploadService FileUploadService
 @inject NavigationManager navigationManager
@@ -35,10 +36,18 @@
     </tr>
     <tr>
         <td>
+            <label for="speech2text">Speech2Text:</label>
+        </td>
+        <td>
+            <InputCheckbox id="speech2text" @bind-Value="speech2text" style="max-width: 200px;" />
+        </td>
+    </tr>
+    <tr>
+        <td>
             <label>Actions:</label>
         </td>
         <td>
-           <button @onclick="GenerateMusic">Generate Music</button>
+           <button @onclick="GenerateMusic">Generate</button>
            <button @onclick="SendInterrupt">Interrupt</button>
         </td>
     </tr>
@@ -87,6 +96,7 @@
 {
     private string text;
     private string duration;
+    private bool speech2text;
     private IBrowserFile file;
     private List<string> messages = new List<string>();
     private HubConnection _hubConnection;
@@ -133,8 +143,15 @@
                 audioFileContent = await FileUploadService.SaveFile(file);
             }
         }
-        RabbitMqService.SendMusicGenRequest(text, duration, audioFileContent);
-        messages.Add("attempting to generate song");
+        MusicGenRequest request = new MusicGenRequest()
+        {
+            Text = text,
+            Duration = duration,
+            AudioFile = audioFileContent,
+            Speech2Text = speech2text
+        };
+        RabbitMqService.SendMusicGenRequest(request);
+        messages.Add("request sent to worker");
 
         // Wait for the RabbitMqService queue to perist the message
         await Task.Delay(1000);

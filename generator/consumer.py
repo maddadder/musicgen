@@ -15,6 +15,9 @@ from pika.exchange_type import ExchangeType
 from io import BytesIO
 import binascii
 import io
+import torch
+from transformers import Speech2TextProcessor, Speech2TextForConditionalGeneration
+import librosa
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -53,21 +56,31 @@ def validate_input(message_data):
     text = message_data.get("text", "")
     duration = message_data.get("duration", "")
     audio_file_base64 = message_data.get("audio_file", "")
+    speech2text = message_data.get("speech2text", "")
 
     if not text and not audio_file_base64:
         LOGGER.warning("text or file is required")
         return False, "text or file is required"
     
-    if not duration:
-        LOGGER.warning("duration is invalid")
-        return False, "duration is invalid"
-
-    try:
-        duration = int(duration)
-    except ValueError:
-        LOGGER.warning("duration is invalid")
-        return False, "duration is invalid"
-
+    if duration:
+        try:
+            duration = int(duration)
+        except ValueError:
+            LOGGER.warning("duration is invalid")
+            return False, "duration is invalid"
+    elif speech2text:
+        try:
+            speech2text = bool(speech2text)
+        except ValueError:
+            LOGGER.warning("speech2text is invalid")
+            return False, "speech2text is invalid"
+        if not audio_file_base64:
+            LOGGER.warning("file is required")
+            return False, "file is required"
+    else:
+        LOGGER.warning("duration or speech2text is required")
+        return False, "duration or speech2text is required"
+    
     if audio_file_base64:
         try:
             decoded_content = base64.b64decode(audio_file_base64)
@@ -121,62 +134,86 @@ def do_work(ch, delivery_tag, body):
         isvalid, validation_result = validate_input(message_data)
         if isvalid:
             text = message_data.get("text", "")
-            duration = int(message_data.get("duration", ""))
+            duration = message_data.get("duration", "")
+            speech2text = message_data.get("speech2text", "")
+            if duration:
+                duration = int(duration)
+            elif speech2text:
+                speech2text = bool(speech2text)
             audio_file_base64 = message_data.get("audio_file", "")
-            if not audio_file_base64:
-                LOGGER.warning("using facebook/musicgen-large")
-                model = MusicGen.get_pretrained('facebook/musicgen-large', device='cuda')
+            if speech2text:
+                target_sr = 32000
+                waveform = None
+                if audio_file_base64:
+                    audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
+                    waveform, target_sr = librosa.load(BytesIO(audio_file_data), sr=16000)
+                model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
+                processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
+                inputs = processor(waveform, sampling_rate=target_sr, return_tensors="pt")
+                generated_ids = model.generate(inputs["input_features"], attention_mask=inputs["attention_mask"])
+                transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)
+                acknowledgment_body = json.dumps({
+                    "status": "completed",
+                    "result": "speech2text successful",
+                    "task_id": message_data.get("task_id"),
+                    "audio_data": audio_file_base64,
+                    "text": transcription[0]
+                })
             else:
-                LOGGER.warning("using facebook/musicgen-melody")
-                model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
-            model.set_generation_params(duration=duration)
-            def _progress(generated, to_generate):
-                #LOGGER.info('generated %s',generated)
-                if INTERRUPTING:
-                    raise Exception("INTERRUPTED")
-            model.set_custom_progress_callback(_progress)
-            target_sr = 32000
-            melody_waveform = None
-            if audio_file_base64:
-                audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
-                melody_waveform, target_sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
-            start = time.time()
-            if(text == None):
-                wav = model.generate_continuation(
-                    prompt=melody_waveform,
-                    prompt_sample_rate=target_sr,
-                    progress=True
-                )
-            else:
-                descriptions = [text]
-                if melody_waveform == None:
-                    wav = model.generate(descriptions, progress=True)
+                if not audio_file_base64:
+                    LOGGER.warning("using facebook/musicgen-large")
+                    model = MusicGen.get_pretrained('facebook/musicgen-large', device='cuda')
                 else:
-                    wav = model.generate_with_chroma(
-                        descriptions=descriptions,
-                        melody_wavs=melody_waveform,
-                        melody_sample_rate=target_sr,
+                    LOGGER.warning("using facebook/musicgen-melody")
+                    model = MusicGen.get_pretrained('facebook/musicgen-melody', device='cuda')
+                model.set_generation_params(duration=duration)
+                def _progress(generated, to_generate):
+                    #LOGGER.info('generated %s',generated)
+                    if INTERRUPTING:
+                        raise Exception("INTERRUPTED")
+                model.set_custom_progress_callback(_progress)
+                target_sr = 32000
+                melody_waveform = None
+                if audio_file_base64:
+                    audio_file_data = base64.b64decode(audio_file_base64.encode("utf-8"))
+                    melody_waveform, target_sr = torchaudio.load(BytesIO(audio_file_data), format="mp3")
+                start = time.time()
+                if(text == None):
+                    wav = model.generate_continuation(
+                        prompt=melody_waveform,
+                        prompt_sample_rate=target_sr,
                         progress=True
                     )
-            wav = wav[0]
+                else:
+                    descriptions = [text]
+                    if melody_waveform == None:
+                        wav = model.generate(descriptions, progress=True)
+                    else:
+                        wav = model.generate_with_chroma(
+                            descriptions=descriptions,
+                            melody_wavs=melody_waveform,
+                            melody_sample_rate=target_sr,
+                            progress=True
+                        )
+                wav = wav[0]
 
-            buffer = io.BytesIO()
-            torchaudio.save(buffer, wav.cpu(), model.sample_rate, format="mp3")
+                buffer = io.BytesIO()
+                torchaudio.save(buffer, wav.cpu(), model.sample_rate, format="mp3")
 
-            # Read the content of the in-memory buffer
-            buffer.seek(0)
-            audio_data_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+                # Read the content of the in-memory buffer
+                buffer.seek(0)
+                audio_data_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
-            # Publish acknowledgment with the audio data
-            acknowledgment_body = json.dumps({
-                "status": "completed",
-                "result": "Generation successful",
-                "task_id": message_data.get("task_id"),
-                "audio_data": audio_data_base64,
-                "text": text
-            })
-            end = time.time()
-            print(f"Generation took {end - start}")
+                # Publish acknowledgment with the audio data
+                acknowledgment_body = json.dumps({
+                    "status": "completed",
+                    "result": "Generation successful",
+                    "task_id": message_data.get("task_id"),
+                    "audio_data": audio_data_base64,
+                    "text": text
+                })
+                end = time.time()
+                print(f"Generation took {end - start}")
         else:
             acknowledgment_body = json.dumps({
                 "status": "completed",
