@@ -157,7 +157,7 @@ def do_work(ch, delivery_tag, body):
                     "result": "speech2text successful",
                     "task_id": message_data.get("task_id"),
                     "audio_data": audio_file_base64,
-                    "text": transcription[0]
+                    "text": " ".join(transcription)
                 })
             else:
                 if not audio_file_base64:
