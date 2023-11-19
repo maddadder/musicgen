@@ -20,7 +20,7 @@ services:
     depends_on:
       - rabbitmq
     ports:
-      - "5001:80"  # Adjust port mapping as needed
+      - "5001:8080"  # Adjust port mapping as needed
     networks:
       - mynetwork
 

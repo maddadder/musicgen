@@ -118,7 +118,7 @@ public class EventBusRabbitMQ : IDisposable, IHostedService
     private async Task ProcessEvent(string eventName, string message)
     {
         // Create the chat client
-        string baseUrl = "http://localhost:80/";
+        string baseUrl = "http://localhost:8080/";
 
         string _hubUrl = baseUrl.TrimEnd('/') + ChatHub.HubUrl;
 
